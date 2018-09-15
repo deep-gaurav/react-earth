@@ -4,6 +4,7 @@ import {OBJLoader} from 'three-obj-loader-es6'
 import model from './models/sphere-mercrator.obj'
 import texture from './models/Surface_Reflection.jpg'
 import './glp.css'
+import capabilitiesxml from './WMTSCapabilities.xml'
 
 class ThreeScene extends Component{
 
@@ -14,6 +15,8 @@ class ThreeScene extends Component{
         this.model=false;
         this.renderwidth=props.rwidth;
         this.renderheight=props.rheight;
+        this.nasob=new Nasatex()
+
     }
     componentDidMount(){
         const width = this.mount.clientWidth
@@ -108,12 +111,81 @@ class ThreeScene extends Component{
     }
 
     render(){
+        var sens=this.nasob.getnames()
         return(
+
             <div
                 className='renderport'
                 ref={(mount) => { this.mount = mount }}
-            />
+            >
+                <select className='insselector' onClick={event => {this.updatetex(event)}} >
+                    {sens.map((value,key )=>(<option value={key}>{value}</option>))}
+                </select>
+                <div className='mountpoint'  ></div>
+
+            </div>
         )
+    }
+    updatetex(ev){
+
+        this.currentsel=ev.currentTarget.selectedIndex
+        this.imagesrc=this.nasob.gettexture(this.currentsel)
+        this.setmaterial(this.imagesrc)
+
+    }
+    setmaterial(src){
+        const textu=new THREE.TextureLoader().load(src)
+        const material = new THREE.MeshBasicMaterial({ map:textu })
+        var obj=this.model
+        console.log("new image:",src)
+        obj.traverse(chiild=>{
+            if (chiild.isMesh){
+                chiild.material=material
+                console.log('child is mesh')
+            }
+        })
+        obj.material=material;
+    }
+
+}
+
+class Nasatex  {
+    constructor(){
+        console.log('LOG TEST');
+        console.log(capabilitiesxml)
+        this.xhr=new XMLHttpRequest()
+        this.xhr.open("GET",capabilitiesxml,false)
+        this.xhr.onload=ev =>  {
+            if(this.xhr.readyState===4 && this.xhr.status===200){
+                this.capabilities=this.xhr.responseXML;
+            }
+        }
+        this.xhr.send()
+    }
+    getLayers(){
+        if(typeof this.capabilities=='undefined')
+            return
+        var num= this.capabilities.getElementsByTagName('Layer').length
+        return num
+    }
+    getnames(){
+        var namearr=[]
+        var layers=this.capabilities.getElementsByTagName('Layer')
+        for(var i=0;i<layers.length;i++)
+            namearr.push(layers[i].getElementsByTagName('ows:Title')[0].textContent)
+        return namearr
+    }
+    gettexture(id){
+        var layer=this.capabilities.getElementsByTagName('Layer')[id]
+        var tms=layer.getElementsByTagName('TileMatrixSet')[0].textContent
+        var rurl=layer.getElementsByTagName('ResourceURL')[0].getAttribute('template')
+        rurl=rurl.replace('{TileMatrixSet}',tms)
+        rurl=rurl.replace('{TileMatrix}','0')
+        rurl=rurl.replace('{TileRow}','0')
+        rurl=rurl.replace('{TileCol}','0')
+        rurl=rurl.replace('{Time}','')
+        return rurl
+
     }
 }
 
